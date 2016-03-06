@@ -1,11 +1,9 @@
-'use strict';
-
 module.exports = {
 
     "googleAuth" : {
-        "clientID" : "YOUR CLIENT ID HERE",
-        "clientSecret" : "YOUR CLIENT SECRET HERE",
+        "clientID" : "CLIENT_ID",
+        "clientSecret" : "CLIENT_SECRET",
         "callbackURLLocal" : "http://localhost:1337/auth/google/callback",
-        "callbackURL" : ""
+        "callbackURL" : "CALLBACK_URL"
     }
 };

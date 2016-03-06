@@ -1,10 +1,12 @@
 'use strict';
 
-const bktree = require('bktree');
 const mongoose = require('mongoose');
+const mdiff = require('mdiff');
 const Tournament = mongoose.model('Tournament');
 
-const SCHEMA_VERSION = '1.1';
+const stringFunctions = require('../libs/string-functions');
+
+const SCHEMA_VERSION = '1.2';
 
 /**
 * Responsible for gathering basic statistics information about a tournament's teams
@@ -702,40 +704,60 @@ function convertToQuizbowlSchema(tournamentid, callback) {
             callback(null, null);
         } else {
             const qbjObj = {version : SCHEMA_VERSION, objects : []};
-            const tournamentObject = {matches : [], registrations : [], type : "Tournament", name : tournament.tournament_name};
+            const tournamentObject = {type : "Tournament", phases : [{name : 'All Rounds', rounds : []}], registrations : [], name : tournament.tournament_name, question_set : tournament.questionSet, info : tournament.description};
             const teamMap = {};
-            // const registrationObjects = makeRegistrationObjects(tournament.teams);
+            const teamNameMap = {};
             tournament.teams.forEach(team => {
-                let teamObj = {id : "team_" + team.shortID, name : team.team_name, players : [], shortID : team.shortID};
-                teamMap[team._id] = {id : "team_" + team.shortID,
-                    name : team.team_name, players : [], shortID : team.shortID};
-                // tournamentObject.registrations.push({$ref : "school_" + tournament.teams[i].shortID});
+                let matchingTeams = tournament.teams.filter(otherTeam => {
+                    return !teamMap[otherTeam._id] && stringFunctions.levenshteinDistance(otherTeam.team_name.toLowerCase(), team.team_name.toLowerCase()) < 2;
+                });
+                matchingTeams.forEach(otherTeam => {
+                    teamMap[otherTeam._id] = {id : "team_" + otherTeam.shortID,
+                        name : otherTeam.team_name, players : [], shortID : otherTeam.shortID};
+                });
+                matchingTeams = matchingTeams.map(otherTeam => {
+                    const copy = {team_name : otherTeam.team_name, _id : otherTeam._id, shortID : otherTeam.shortID};
+                    const teamPlayers = tournament.players.filter(player => {
+                        return player.teamID == otherTeam._id;
+                    });
+                    copy.players = teamPlayers;
+                    return copy;
+                });
+                if (matchingTeams.length === 1) {
+                    teamNameMap[matchingTeams[0].team_name] = matchingTeams;
+                } else if (matchingTeams.length > 1) {
+                    const lcs = mdiff(matchingTeams[0].team_name, matchingTeams[1].team_name).getLcs();
+                    teamNameMap[lcs] = matchingTeams;
+                }
             });
-            tournament.players.forEach(player => {
-                let teamid = player.teamID;
-                let playerObj = {id : "player_" + player.shortID, name : player.player_name};
-                teamMap[teamid].players.push(playerObj);
-            });
-            for (let teamid in teamMap) {
-                if (teamMap.hasOwnProperty(teamid)) {
-                    const teamObj = {type : "Registration"};
-                    teamObj.id = "school_" + teamMap[teamid].shortID;
-                    teamObj.name = teamMap[teamid].name;
-                    teamObj.teams = [];
-                    let newTeam = {id : teamMap[teamid].id, name : teamMap[teamid].name, players : teamMap[teamid].players};
-                    teamObj.teams.push(newTeam);
-                    qbjObj.objects.push(teamObj);
+            let counter = 1;
+            for (let teamName in teamNameMap) {
+                if (teamNameMap.hasOwnProperty(teamName)) {
+                    const regObj = makeRegistrationObject(teamName, teamNameMap[teamName], counter);
+                    qbjObj.objects.push(regObj);
+                    tournamentObject.registrations.push({$ref : regObj.id});
+                    counter++;
                 }
             }
             const playerMap = makePlayerMap(tournament.players);
             const pointScheme = Object.keys(tournament.pointScheme);
+            const gameMap = {};
             tournament.games.forEach(game => {
-                tournamentObject.matches.push({$ref : "game_" + game.shortID});
                 let gameObj = makeGameObject(game, teamMap, playerMap, pointScheme);
                 if (gameObj) {
                     qbjObj.objects.push(gameObj);
                 }
+                if (!gameMap[game.round]) {
+                    gameMap[game.round] = [];
+                }
+                gameMap[game.round].push({$ref : 'game_' + game.shortID});
             });
+            for (let roundNumber in gameMap) {
+                if (gameMap.hasOwnProperty(roundNumber)) {
+                    var roundObject = {name : "Round " + roundNumber, matches : gameMap[roundNumber]};
+                    tournamentObject.phases[0].rounds.push(roundObject);
+                }
+            }
             qbjObj.objects.push(tournamentObject);
             callback(null, qbjObj);
         }
@@ -746,10 +768,17 @@ function convertToQuizbowlSchema(tournamentid, callback) {
 * Couples teams together based on bktree and longest-common-subsequence
 * TODO
 */
-function makeRegistrationObjects(teams) {
-    let teamNames = teams.map(team => {
-        return team.team_name;
+function makeRegistrationObject(schoolName, teams, counter) {
+    const lowercaseTeamName = schoolName.toLowerCase().replace(/\s/g, '_');
+    const regObj = {name : schoolName, teams : [], id : 'school_' + counter + '_' + lowercaseTeamName, type : 'Registration'};
+    teams.forEach(team => {
+        const teamObj = {name : team.team_name, id : 'team_' + team.shortID, players : []};
+        team.players.forEach(player => {
+            teamObj.players.push({name : player.player_name, id : 'player_' + player.shortID});
+        });
+        regObj.teams.push(teamObj);
     });
+    return regObj;
 }
 
 /**
@@ -777,8 +806,13 @@ function makePlayerMap(players) {
 */
 function makeGameObject(game, teamMap, playerMap, pointScheme) {
     const gameObject = {id : "game_" + game.shortID, location : game.room,
-        match_teams : [], match_questions : [], round : game.round, tossups : game.tossupsheard, type : "Match",
-        moderator : game.moderator, notes : game.notes};
+        match_teams : [], match_questions : [], round : game.round, tossups_read : game.tossupsheard,
+        type : "Match", moderator : game.moderator, notes : game.notes};
+    if (game.team1.overtimeTossupsGotten && game.team2.overtimeTossupsGotten) {
+        gameObject.overtime_tossups_read = game.team1.overtimeTossupsGotten + game.team2.overtimeTossupsGotten;
+    } else {
+        gameObject.overtime_tossups_read = 0;
+    }
     const numPlayersTeam1 = Object.keys(game.team1.playerStats).length;
     const numPlayersTeam2 = Object.keys(game.team2.playerStats).length;
     if (teamMap[game.team1.team_id] && teamMap[game.team2.team_id]) {
@@ -876,15 +910,15 @@ function makePlayerObject(playerMap, player, playerStats, game, pointScheme) {
     let playerObject = null;
     if (playerMap[player]) {
         playerObject = {
-            player : {name : playerMap[player].name},
+            player : {$ref : 'player_' + playerMap[player].shortID},
             tossups_heard : Math.floor(parseFloat(playerStats[player].gp) * game.tossupsheard),
             answer_counts : []
         };
     }
     let tossupTotal = 0;
     pointScheme.forEach(pv => {
-        const answerObject = {};
-        answerObject.value = parseFloat(pv);
+        const answerObject = {answer_type : {}};
+        answerObject.answer_type.value = parseFloat(pv);
         if (playerStats[player][pv]) {
             let number = parseFloat(playerStats[player][pv]);
             if (number == null) {
@@ -895,7 +929,7 @@ function makePlayerObject(playerMap, player, playerStats, game, pointScheme) {
         } else {
             answerObject.number = 0;
         }
-        tossupTotal += (answerObject.value * answerObject.number);
+        tossupTotal += (answerObject.answer_type.value * answerObject.number);
         if (playerObject) {
             playerObject.answer_counts.push(answerObject);
         }

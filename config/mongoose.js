@@ -1,13 +1,11 @@
-'use strict';
-
 var config = require("./config");
 var mongoose = require("mongoose");
 
 module.exports = function() {
-    var db = mongoose.connect(config.db_deployment);
+    var db = mongoose.connect(config.db_production);
     var conn = mongoose.connection;
     conn.on('error', console.error.bind(console, "Connection Error: "));
-    conn.once('open', function(callback) {
+    conn.once('open', function(err) {
         // Nothing needs to go here
     });
     require("../app/models/tournament");

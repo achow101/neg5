@@ -271,9 +271,11 @@ function addGameToTournament(tournamentid, gameinfo, phases, callback) {
     newGame.team1.team_id = gameinfo.leftteamselect;
     newGame.team1.score = !gameinfo.leftteamscore ? 0 : gameinfo.leftteamscore;
     newGame.team1.bouncebacks = !gameinfo.leftbounceback ? 0 : gameinfo.leftbounceback;
+    newGame.team1.overtimeTossupsGotten = !gameinfo.overtimetu1 ? 0 : gameinfo.overtimetu1;
     newGame.team2.team_id = gameinfo.rightteamselect;
     newGame.team2.score = !gameinfo.rightteamscore ? 0 : gameinfo.rightteamscore;
     newGame.team2.bouncebacks = !gameinfo.rightbounceback ? 0 : gameinfo.rightbounceback;
+    newGame.team2.overtimeTossupsGotten = !gameinfo.overtimetu2 ? 0 : gameinfo.overtimetu2;
     let playerNum = 1;
     let playerleft = "player" + playerNum + "_leftid";
     newGame.team1.playerStats = {};

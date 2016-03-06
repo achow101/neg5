@@ -12,7 +12,7 @@ block content
 
     +navbar
 
-    div(class="content-wrapper box"  style='padding:75px;padding-top:0px')
+    div(class="content-wrapper box"  style='padding:75px;padding-top:100px')
         input(type="hidden" value="#{tid}" id="tournamentid")
         div(class="row")
             div(class="col-md-6 col-lg-6 col-sm-6")
@@ -27,7 +27,7 @@ block content
                                 div(style="text-align:left")
                                     br
                                     br
-                                    select(class="form-control input-lg center-text teamselect" id='leftselect')
+                                    select(class="form-control input-lg center-text teamselect btn-shadow" id='leftselect')
                                         option(disabled selected value="") Select Team 1
                                         each team in teams
                                             option(value="#{team._id}") #{team.team_name}
@@ -36,7 +36,7 @@ block content
                                 div(style="text-align:center")
                                     br
                                     br
-                                    select(class="form-control input-lg center-text teamselect" id='rightselect')
+                                    select(class="form-control input-lg center-text teamselect btn-shadow" id='rightselect')
                                         option(disabled selected value="") Select Team 2
                                         each team in teams
                                             option(value="#{team._id}") #{team.team_name}
@@ -128,7 +128,7 @@ block content
                                     th(class="table-head" style='text-align:center') Room
                                     th(class="table-head" style='text-align:center') Moderator
                                     th(class='table-head' style='text-align:center') Packet
-                                    th(class="table-head" style="text-align:center") Phase
+                                    th(class="table-head" style="text-align:center") Phases
                                     th(class="table-head" style='text-align:center') Notes
                                 tbody
                                     tr(id="tr-metadata")
@@ -147,7 +147,7 @@ block content
                                                         option(selected value='#{phase.phase_id}') #{phase.name}
                                                     else
                                                         option(value='#{phase.phase_id}') #{phase.name}
-                                        td(class='td-scoresheet' width='200')
+                                        td(class='td-scoresheet' width='175')
                                             textarea(class='input-scoresheet' id='notes' style='text-align:left') -
 
                 div(class="row")
