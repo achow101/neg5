@@ -24,7 +24,7 @@ function addTournament(director, name, date, location, description, questionset,
         date : date,
         description : description,
         questionSet : questionset,
-        phases : [{phase_id : shortid.generate(), name : "Default", active : true}]
+        phases : [{phase_id : shortid.generate(), name : "Default Phase", active : true}]
     });
     tourney.shortID = shortid.generate();
     tourney.save(err => {
@@ -621,7 +621,8 @@ function findDirectors(query, callback) {
     query = query.trim();
     try {
         const rex = new RegExp(".*" + query + ".*", "i");
-        TournamentDirector.find({$or : [{email : rex}, {name : rex}]}, (err, directors) => {
+        const finalQuery = {$and : [{visible : true}, {$or : [{email : rex}, {name : rex}]}]};
+        TournamentDirector.find(finalQuery, (err, directors) => {
             if (err) {
                 console.log(err);
                 callback(err);
@@ -633,6 +634,7 @@ function findDirectors(query, callback) {
             }
         });
     } catch (exception) {
+        console.log(exception);
         callback(exception, []);
     }
 }
